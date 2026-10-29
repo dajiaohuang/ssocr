@@ -681,9 +681,9 @@ Imlib_Image white_border(Imlib_Image *source_image, int bdwidth)
 
 /* shear the image
  * the top line is unchanged
- * the bottom line is moved offset pixels to the right
- * the other lines are moved yPos*offset/(height-1) pixels to the right
- * white pixels are inserted at the left side */
+ * the bottom line is moved offset pixels (right for positive, left for negative)
+ * the other lines are moved yPos*offset/(height-1) pixels
+ * background pixels fill the uncovered side */
 Imlib_Image shear(Imlib_Image *source_image, int offset)
 {
   Imlib_Image new_image; /* construct filtered image here */
@@ -702,17 +702,32 @@ Imlib_Image shear(Imlib_Image *source_image, int offset)
   width = imlib_image_get_width();
   new_image = imlib_clone_image();
 
-  /* move every line to the right */
+  /* move every line */
   for(y=1; y<height; y++) {
-    shift = y * offset / (height-1);
-    /* copy pixels */
-    for(x=width-1; x>=shift; x--) {
-      imlib_image_query_pixel(x-shift, y, &color_return);
-      draw_color_pixel(&new_image, x, y, color_return);
-    }
-    /* fill with background */
-    for(x=0; x<shift; x++) {
-      draw_bg_pixel(&new_image, x, y);
+    shift = (int)((long long)y * offset / (height-1));
+    if(shift >= width || shift <= -width) {
+      /* the shifted line no longer overlaps the image */
+      for(x=0; x<width; x++) {
+        draw_bg_pixel(&new_image, x, y);
+      }
+    } else if(shift > 0) {
+      /* move right and fill the left side with background */
+      for(x=width-1; x>=shift; x--) {
+        imlib_image_query_pixel(x-shift, y, &color_return);
+        draw_color_pixel(&new_image, x, y, color_return);
+      }
+      for(x=0; x<shift; x++) {
+        draw_bg_pixel(&new_image, x, y);
+      }
+    } else if(shift < 0) {
+      /* move left and fill the right side with background */
+      for(x=0; x<width+shift; x++) {
+        imlib_image_query_pixel(x-shift, y, &color_return);
+        draw_color_pixel(&new_image, x, y, color_return);
+      }
+      for(x=width+shift; x<width; x++) {
+        draw_bg_pixel(&new_image, x, y);
+      }
     }
   }
 
